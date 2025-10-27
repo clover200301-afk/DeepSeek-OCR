@@ -1,0 +1,270 @@
+<!-- markdownlint-disable first-line-h1 -->
+<!-- markdownlint-disable html -->
+<!-- markdownlint-disable no-duplicate-header -->
+
+
+<div align="center">
+  <img src="assets/logo.svg" width="60%" alt="DeepSeek AI" />
+</div>
+
+
+<hr>
+<div align="center">
+  <a href="https://www.deepseek.com/" target="_blank">
+    <img alt="Homepage" src="assets/badge.svg" />
+  </a>
+  <a href="https://huggingface.co/deepseek-ai/DeepSeek-OCR" target="_blank">
+    <img alt="Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-DeepSeek%20AI-ffc107?color=ffc107&logoColor=white" />
+  </a>
+
+</div>
+
+<div align="center">
+
+  <a href="https://discord.gg/Tc7c45Zzu5" target="_blank">
+    <img alt="Discord" src="https://img.shields.io/badge/Discord-DeepSeek%20AI-7289da?logo=discord&logoColor=white&color=7289da" />
+  </a>
+  <a href="https://twitter.com/deepseek_ai" target="_blank">
+    <img alt="Twitter Follow" src="https://img.shields.io/badge/Twitter-deepseek_ai-white?logo=x&logoColor=white" />
+  </a>
+
+</div>
+
+
+
+<p align="center">
+  <a href="https://huggingface.co/deepseek-ai/DeepSeek-OCR"><b>📥 模型下载</b></a> |
+  <a href="https://github.com/deepseek-ai/DeepSeek-OCR/blob/main/DeepSeek_OCR_paper.pdf"><b>📄 论文链接</b></a> |
+  <a href="https://arxiv.org/abs/2510.18234"><b>📄 Arxiv 论文链接</b></a> |
+  <a href="README.md"><b>🌐 English</b></a>
+</p>
+
+<h2>
+<p align="center">
+  <a href="">DeepSeek-OCR: 视觉-文本上下文光学压缩</a>
+</p>
+</h2>
+
+<p align="center">
+<img src="assets/fig1.png" style="width: 1000px" align=center>
+</p>
+<p align="center">
+<a href="">探索视觉-文本压缩的边界。</a>       
+</p>
+
+## 发布日志
+- [2025/10/23]🚀🚀🚀 DeepSeek-OCR 现已正式在上游 [vLLM](https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html#installing-vllm) 中得到支持。感谢 [vLLM](https://github.com/vllm-project/vllm) 团队的帮助。
+- [2025/10/20]🚀🚀🚀 我们发布了 DeepSeek-OCR，这是一个从以 LLM 为中心的角度研究视觉编码器作用的模型。
+
+## 目录
+- [发布日志](#发布日志)
+- [目录](#目录)
+- [安装](#安装)
+- [vLLM 推理](#vllm-推理)
+- [Transformers 推理](#transformers-推理)
+- [支持模式](#支持模式)
+- [提示词示例](#提示词示例)
+- [可视化展示](#可视化展示)
+- [致谢](#致谢)
+- [引用](#引用)
+- [许可证](#许可证)
+- [联系方式](#联系方式)
+  
+
+
+
+
+## 安装
+>我们的环境是 cuda11.8 + torch2.6.0。
+
+1. 克隆此仓库并进入 DeepSeek-OCR 文件夹
+```bash
+git clone https://github.com/deepseek-ai/DeepSeek-OCR.git
+```
+
+2. 创建 Conda 环境
+```Shell
+conda create -n deepseek-ocr python=3.12.9 -y
+conda activate deepseek-ocr
+```
+
+3. 安装依赖包
+
+- 下载 vllm-0.8.5 [whl包](https://github.com/vllm-project/vllm/releases/tag/v0.8.5) 
+```Shell
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+pip install vllm-0.8.5+cu118-cp38-abi3-manylinux1_x86_64.whl
+pip install -r requirements.txt
+pip install flash-attn==2.7.3 --no-build-isolation
+```
+
+**注意：** 如果你想在同一环境中运行 vLLM 和 transformers 代码，不需要担心像这样的安装错误：vllm 0.8.5+cu118 requires transformers>=4.51.1
+
+## vLLM 推理
+- VLLM:
+>**注意：** 在 DeepSeek-OCR-master/DeepSeek-OCR-vllm/config.py 中修改 INPUT_PATH/OUTPUT_PATH 和其他设置
+
+```Shell
+cd DeepSeek-OCR-master/DeepSeek-OCR-vllm
+```
+
+1. 图像推理：流式输出
+```Shell
+python run_dpsk_ocr_image.py
+```
+
+2. PDF推理：并发处理 ~2500tokens/s (在 A100-40G 上)
+```Shell
+python run_dpsk_ocr_pdf.py
+```
+
+3. 批量评估基准测试
+```Shell
+python run_dpsk_ocr_eval_batch.py
+```
+
+**[2025/10/23] 上游 [vLLM](https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html#installing-vllm) 版本：**
+
+```shell
+uv venv
+source .venv/bin/activate
+# 在 v0.11.1 发布之前，需要从 nightly 版本安装 vLLM
+uv pip install -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
+```
+
+```python
+from vllm import LLM, SamplingParams
+from vllm.model_executor.models.deepseek_ocr import NGramPerReqLogitsProcessor
+from PIL import Image
+
+# 创建模型实例
+llm = LLM(
+    model="deepseek-ai/DeepSeek-OCR",
+    enable_prefix_caching=False,
+    mm_processor_cache_gb=0,
+    logits_processors=[NGramPerReqLogitsProcessor]
+)
+
+# 准备批量输入与图像文件
+image_1 = Image.open("path/to/your/image_1.png").convert("RGB")
+image_2 = Image.open("path/to/your/image_2.png").convert("RGB")
+prompt = "<image>\nFree OCR."
+
+model_input = [
+    {
+        "prompt": prompt,
+        "multi_modal_data": {"image": image_1}
+    },
+    {
+        "prompt": prompt,
+        "multi_modal_data": {"image": image_2}
+    }
+]
+
+sampling_param = SamplingParams(
+            temperature=0.0,
+            max_tokens=8192,
+            # ngram logit processor 参数
+            extra_args=dict(
+                ngram_size=30,
+                window_size=90,
+                whitelist_token_ids={128821, 128822},  # 白名单: <td>, </td>
+            ),
+            skip_special_tokens=False,
+        )
+# 生成输出
+model_outputs = llm.generate(model_input, sampling_param)
+
+# 打印输出
+for output in model_outputs:
+    print(output.outputs[0].text)
+```
+
+## Transformers 推理
+- Transformers
+```python
+from transformers import AutoModel, AutoTokenizer
+import torch
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+model_name = 'deepseek-ai/DeepSeek-OCR'
+
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+model = AutoModel.from_pretrained(model_name, _attn_implementation='flash_attention_2', trust_remote_code=True, use_safetensors=True)
+model = model.eval().cuda().to(torch.bfloat16)
+
+# prompt = "<image>\nFree OCR. "
+prompt = "<image>\n<|grounding|>Convert the document to markdown. "
+image_file = 'your_image.jpg'
+output_path = 'your/output/dir'
+
+res = model.infer(tokenizer, prompt=prompt, image_file=image_file, output_path = output_path, base_size = 1024, image_size = 640, crop_mode=True, save_results = True, test_compress = True)
+```
+
+或者你可以：
+```Shell
+cd DeepSeek-OCR-master/DeepSeek-OCR-hf
+python run_dpsk_ocr.py
+```
+
+## 支持模式
+当前开源模型支持以下模式：
+- 原生分辨率：
+  - Tiny: 512×512 （64 个视觉标记）✅
+  - Small: 640×640 （100 个视觉标记）✅
+  - Base: 1024×1024 （256 个视觉标记）✅
+  - Large: 1280×1280 （400 个视觉标记）✅
+- 动态分辨率
+  - Gundam: n×640×640 + 1×1024×1024 ✅
+
+## 提示词示例
+```python
+# 文档: <image>\n<|grounding|>Convert the document to markdown.
+# 其他图像: <image>\n<|grounding|>OCR this image.
+# 无布局: <image>\nFree OCR.
+# 文档中的图表: <image>\nParse the figure.
+# 通用: <image>\nDescribe this image in detail.
+# 识别定位: <image>\nLocate <|ref|>xxxx<|/ref|> in the image.
+# 例如：'先天下之忧而忧'
+```
+
+
+## 可视化展示
+<table>
+<tr>
+<td><img src="assets/show1.jpg" style="width: 500px"></td>
+<td><img src="assets/show2.jpg" style="width: 500px"></td>
+</tr>
+<tr>
+<td><img src="assets/show3.jpg" style="width: 500px"></td>
+<td><img src="assets/show4.jpg" style="width: 500px"></td>
+</tr>
+</table>
+
+
+## 致谢
+
+我们要感谢 [Vary](https://github.com/Ucas-HaoranWei/Vary/)、[GOT-OCR2.0](https://github.com/Ucas-HaoranWei/GOT-OCR2.0/)、[MinerU](https://github.com/opendatalab/MinerU)、[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)、[OneChart](https://github.com/LingyvKong/OneChart)、[Slow Perception](https://github.com/Ucas-HaoranWei/Slow-Perception) 提供的宝贵模型和思路。
+
+我们还要感谢以下基准测试：[Fox](https://github.com/ucaslcl/Fox)、[OminiDocBench](https://github.com/opendatalab/OmniDocBench)。
+
+## 引用
+
+```bibtex
+@article{wei2025deepseek,
+  title={DeepSeek-OCR: Contexts Optical Compression},
+  author={Wei, Haoran and Sun, Yaofeng and Li, Yukun},
+  journal={arXiv preprint arXiv:2510.18234},
+  year={2025}
+}
+```
+
+## 许可证
+
+此项目采用相应的开源许可证。详细信息请参见项目仓库。
+
+## 联系方式
+
+- Discord: [DeepSeek AI 社区](https://discord.gg/Tc7c45Zzu5)
+- Twitter: [@deepseek_ai](https://twitter.com/deepseek_ai)
+- 官网: [deepseek.com](https://www.deepseek.com/)
